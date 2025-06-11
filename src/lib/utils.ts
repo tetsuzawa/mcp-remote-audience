@@ -704,3 +704,19 @@ export function setupSignalHandlers(cleanup: () => Promise<void>) {
 export function getServerUrlHash(serverUrl: string): string {
   return crypto.createHash('md5').update(serverUrl).digest('hex')
 }
+
+export function sanitizeUrl(raw: string) {
+  const url = new URL(raw)
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error(`Invalid url to pass to open(): ${url}`)
+  }
+  url.hostname = encodeURIComponent(url.hostname)
+  url.pathname = url.pathname.slice(0, 1) + encodeURIComponent(url.pathname.slice(1))
+  url.search = url.search.slice(0, 1) + Array.from(url.searchParams.entries()).map(sanitizeParam).join('&')
+  url.hash = url.hash.slice(0, 1) + encodeURIComponent(url.hash.slice(1))
+  return url.href
+}
+
+function sanitizeParam([k, v]: [string, string]) {
+  return `${encodeURIComponent(k)}${v.length > 0 ? `=${encodeURIComponent(v)}` : ''}`
+}

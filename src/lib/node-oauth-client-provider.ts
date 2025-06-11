@@ -9,7 +9,7 @@ import {
 import type { OAuthProviderOptions, StaticOAuthClientMetadata } from './types'
 import { readJsonFile, writeJsonFile, readTextFile, writeTextFile, deleteConfigFile } from './mcp-auth-config'
 import { StaticOAuthClientInformationFull } from './types'
-import { getServerUrlHash, log, debugLog, DEBUG, MCP_REMOTE_VERSION } from './utils'
+import { getServerUrlHash, log, debugLog, DEBUG, MCP_REMOTE_VERSION, sanitizeUrl } from './utils'
 import { randomUUID } from 'node:crypto'
 
 /**
@@ -172,7 +172,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     if (DEBUG) debugLog('Redirecting to authorization URL', authorizationUrl.toString())
 
     try {
-      await open(authorizationUrl.toString())
+      await open(sanitizeUrl(authorizationUrl.toString()))
       log('Browser opened automatically.')
     } catch (error) {
       log('Could not open browser automatically. Please copy and paste the URL above into your browser.')
