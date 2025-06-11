@@ -706,11 +706,22 @@ export function getServerUrlHash(serverUrl: string): string {
 }
 
 export function sanitizeUrl(raw: string) {
-  const url = new URL(raw)
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error(`Invalid url to pass to open(): ${url}`)
+  const abort = () => {
+    throw new Error(`Invalid url to pass to open(): ${raw}`)
   }
-  url.hostname = encodeURIComponent(url.hostname)
+  let url!: URL
+  try {
+    url = new URL(raw)
+  } catch (_) {
+    abort()
+  }
+
+  // Don't allow any other scheme than http(s)
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') abort()
+  // Hostnames can't be updated, but let's reject if they contain anything suspicious
+  if (url.hostname !== encodeURIComponent(url.hostname)) abort()
+
+  // Forcibly sanitise all the pieces of the URL
   url.pathname = url.pathname.slice(0, 1) + encodeURIComponent(url.pathname.slice(1)).replace(/%2f/ig,'/')
   url.search = url.search.slice(0, 1) + Array.from(url.searchParams.entries()).map(sanitizeParam).join('&')
   url.hash = url.hash.slice(0, 1) + encodeURIComponent(url.hash.slice(1))

@@ -46,6 +46,19 @@ describe('sanitizeUrl', () => {
     })
   })
 
+  describe('should reject malicious hosts', () => {
+    const invalidProtocolUrls = [
+      'https://www.$(calc.exe).com/foo',
+      'https://www.example.com:$(calc.exe)/foo',
+    ]
+
+    invalidProtocolUrls.forEach((url) => {
+      it(`should reject: ${url}`, () => {
+        expect(() => sanitizeUrl(url)).toThrow('Invalid url to pass to open()')
+      })
+    })
+  })
+
   describe('should properly encode URL components', () => {
     it('should reject URLs with spaces in hostname', () => {
       // URLs with spaces in hostname are invalid
