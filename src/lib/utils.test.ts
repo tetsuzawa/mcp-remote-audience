@@ -6,8 +6,8 @@ describe('sanitizeUrl', () => {
     const testCases = [
       { input: 'http://example.com', expected: 'http://example.com/' },
       { input: 'https://www.google.com', expected: 'https://www.google.com/' },
-      { input: 'http://test.com/path/to/resource', expected: 'http://test.com/path%2Fto%2Fresource' },
-      { input: 'https://api.github.com/users/octocat', expected: 'https://api.github.com/users%2Foctocat' },
+      { input: 'http://test.com/path/to/resource', expected: 'http://test.com/path/to/resource' },
+      { input: 'https://api.github.com/users/octocat', expected: 'https://api.github.com/users/octocat' },
       {
         input: 'https://subdomain.example.com/page?param=value#section',
         expected: 'https://subdomain.example.com/page?param=value#section',
@@ -77,13 +77,13 @@ describe('sanitizeUrl', () => {
     it('should handle URL with all components', () => {
       const complexUrl = 'https://user:pass@example.com:8080/path/to/resource?param=value&other=test#fragment'
       const result = sanitizeUrl(complexUrl)
-      expect(result).toBe('https://user:pass@example.com:8080/path%2Fto%2Fresource?param=value&other=test#fragment')
+      expect(result).toBe('https://user:pass@example.com:8080/path/to/resource?param=value&other=test#fragment')
     })
 
     it('should preserve valid URL structure', () => {
       const url = 'https://api.example.com/v1/users?limit=10&offset=0#results'
       const result = sanitizeUrl(url)
-      expect(result).toBe('https://api.example.com/v1%2Fusers?limit=10&offset=0#results')
+      expect(result).toBe('https://api.example.com/v1/users?limit=10&offset=0#results')
     })
   })
 

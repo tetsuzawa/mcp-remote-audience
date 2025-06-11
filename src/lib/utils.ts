@@ -711,7 +711,7 @@ export function sanitizeUrl(raw: string) {
     throw new Error(`Invalid url to pass to open(): ${url}`)
   }
   url.hostname = encodeURIComponent(url.hostname)
-  url.pathname = url.pathname.slice(0, 1) + encodeURIComponent(url.pathname.slice(1))
+  url.pathname = url.pathname.slice(0, 1) + encodeURIComponent(url.pathname.slice(1)).replace(/%2f/ig,'/')
   url.search = url.search.slice(0, 1) + Array.from(url.searchParams.entries()).map(sanitizeParam).join('&')
   url.hash = url.hash.slice(0, 1) + encodeURIComponent(url.hash.slice(1))
   return url.href
