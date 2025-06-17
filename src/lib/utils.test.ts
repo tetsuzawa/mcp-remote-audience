@@ -84,6 +84,11 @@ describe('sanitizeUrl', () => {
       const result = sanitizeUrl('https://example.com?empty&hasvalue=test')
       expect(result).toBe('https://example.com/?empty&hasvalue=test')
     })
+
+    it('should encode basic auth', () => {
+      const result = sanitizeUrl('http://user$(calc)r:pass$(calc)word@domain.com')
+      expect(result).toBe('http://user%24(calc)r:pass%24(calc)word@domain.com/')
+    })
   })
 
   describe('should handle complex URLs', () => {

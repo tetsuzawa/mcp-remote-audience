@@ -722,6 +722,8 @@ export function sanitizeUrl(raw: string) {
   if (url.hostname !== encodeURIComponent(url.hostname)) abort()
 
   // Forcibly sanitise all the pieces of the URL
+  if (url.username) url.username = encodeURIComponent(url.username)
+  if (url.password) url.password = encodeURIComponent(url.password)
   url.pathname = url.pathname.slice(0, 1) + encodeURIComponent(url.pathname.slice(1)).replace(/%2f/ig,'/')
   url.search = url.search.slice(0, 1) + Array.from(url.searchParams.entries()).map(sanitizeParam).join('&')
   url.hash = url.hash.slice(0, 1) + encodeURIComponent(url.hash.slice(1))
