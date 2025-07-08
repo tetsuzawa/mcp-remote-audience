@@ -27,6 +27,10 @@ export interface OAuthProviderOptions {
   staticOAuthClientMetadata?: StaticOAuthClientMetadata
   /** Static OAuth client information to use instead of OAuth registration */
   staticOAuthClientInfo?: StaticOAuthClientInformationFull
+  /** Resource parameter to send to the authorization server */
+  authorizeResource?: string
+  /** OAuth scopes to request (default: 'openid email profile') */
+  scopes?: string
 }
 
 /**
@@ -39,6 +43,8 @@ export interface OAuthCallbackServerOptions {
   path: string
   /** Event emitter to signal when auth code is received */
   events: EventEmitter
+  /** Timeout in milliseconds for the auth callback server's long poll */
+  authTimeoutMs?: number
 }
 
 // optional tatic OAuth client information

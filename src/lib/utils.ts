@@ -78,17 +78,101 @@ export function log(str: string, ...rest: unknown[]) {
   debugLog(str, ...rest)
 }
 
+type Message = any
+const MESSAGE_BLOCKED = Symbol('MessageBlocked')
+const isMessageBlocked = (value: any): value is typeof MESSAGE_BLOCKED => value === MESSAGE_BLOCKED
+
+export function createMessageTransformer({
+  transformRequestFunction,
+  transformResponseFunction,
+}: {
+  transformRequestFunction?: null | ((request: Message) => Message | typeof MESSAGE_BLOCKED)
+  transformResponseFunction?: null | ((request: Message, response: Message) => Message)
+} = {}) {
+  const pendingRequests = new Map<string, Message>()
+
+  const interceptRequest = (message: Message) => {
+    const messageId = message.id
+    if (!messageId) return message
+    pendingRequests.set(messageId, message)
+    return transformRequestFunction?.(message) ?? message
+  }
+
+  const interceptResponse = (message: Message) => {
+    const messageId = message.id
+    if (!messageId) return message
+    const originalRequest = pendingRequests.get(messageId)
+    pendingRequests.delete(messageId)
+    return transformResponseFunction?.(originalRequest, message) ?? message
+  }
+
+  return {
+    interceptRequest,
+    interceptResponse,
+  }
+}
+
 /**
  * Creates a bidirectional proxy between two transports
  * @param params The transport connections to proxy between
  */
-export function mcpProxy({ transportToClient, transportToServer }: { transportToClient: Transport; transportToServer: Transport }) {
+export function mcpProxy({
+  transportToClient,
+  transportToServer,
+  ignoredTools = [],
+}: {
+  transportToClient: Transport
+  transportToServer: Transport
+  ignoredTools?: string[]
+}) {
   let transportToClientClosed = false
   let transportToServerClosed = false
 
+  const messageTransformer = createMessageTransformer({
+    transformRequestFunction: (request: Message) => {
+      // Block tools/call for ignored tools
+      if (request.method === 'tools/call' && request.params?.name) {
+        const toolName = request.params.name
+        if (!shouldIncludeTool(ignoredTools, toolName)) {
+          // Send error response back to client immediately
+          const errorResponse = {
+            jsonrpc: '2.0' as const,
+            id: request.id,
+            error: {
+              code: -32603,
+              message: `Tool "${toolName}" is not available`,
+            },
+          }
+          transportToClient.send(errorResponse).catch(onClientError)
+          // Return symbol to indicate this request should not be forwarded
+          return MESSAGE_BLOCKED
+        }
+      }
+      return request
+    },
+    transformResponseFunction: (req: Message, res: Message) => {
+      if (req.method === 'tools/list') {
+        return {
+          ...res,
+          result: {
+            ...res.result,
+            tools: res.result.tools.filter((tool: any) => shouldIncludeTool(ignoredTools, tool.name)),
+          },
+        }
+      }
+      return res
+    },
+  })
+
   transportToClient.onmessage = (_message) => {
     // TODO: fix types
-    const message = _message as any
+    const message = messageTransformer.interceptRequest(_message as any)
+
+    // If interceptor returns MESSAGE_BLOCKED, don't forward the message
+    if (isMessageBlocked(message)) {
+      return
+    }
+
     log('[Local→Remote]', message.method || message.id)
 
     debugLog('Local → Remote message', {
@@ -110,7 +194,7 @@ export function mcpProxy({ transportToClient, transportToServer }: { transportTo
 
   transportToServer.onmessage = (_message) => {
     // TODO: fix types
-    const message = _message as any
+    const message = messageTransformer.interceptResponse(_message as any)
     log('[Remote→Local]', message.method || message.id)
 
     debugLog('Remote → Local message', {
@@ -378,7 +462,7 @@ export function setupOAuthCallbackServerWithLongPoll(options: OAuthCallbackServe
     const longPollTimeout = setTimeout(() => {
       log('Long poll timeout reached, responding with 202')
       res.status(202).send('Authentication in progress')
-    }, 30000)
+    }, options.authTimeoutMs || 30000)
 
     // If auth completes while we're waiting, send the response immediately
     authCompletedPromise
@@ -521,7 +605,7 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
   while (i < args.length) {
     if (args[i] === '--header' && i < args.length - 1) {
       const value = args[i + 1]
-      const match = value.match(/^([A-Za-z0-9_-]+):(.*)$/)
+      const match = value.match(/^([A-Za-z0-9_-]+):\s*(.*)$/)
       if (match) {
         headers[match[1]] = match[2]
       } else {
@@ -596,6 +680,42 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
     }
   }
 
+  // Parse resource to authorize
+  let authorizeResource = '' // Default
+  const resourceIndex = args.indexOf('--resource')
+  if (resourceIndex !== -1 && resourceIndex < args.length - 1) {
+    authorizeResource = args[resourceIndex + 1]
+    log(`Using authorize resource: ${authorizeResource}`)
+  }
+
+  // Parse ignored tools
+  const ignoredTools: string[] = []
+  let j = 0
+  while (j < args.length) {
+    if (args[j] === '--ignore-tool' && j < args.length - 1) {
+      const toolName = args[j + 1]
+      ignoredTools.push(toolName)
+      log(`Ignoring tool: ${toolName}`)
+      args.splice(j, 2)
+      // Do not increment j, as the array has shifted
+      continue
+    }
+    j++
+  }
+
+  // Parse auth timeout
+  let authTimeoutMs = 30000 // Default 30 seconds
+  const authTimeoutIndex = args.indexOf('--auth-timeout')
+  if (authTimeoutIndex !== -1 && authTimeoutIndex < args.length - 1) {
+    const timeoutSeconds = parseInt(args[authTimeoutIndex + 1], 10)
+    if (!isNaN(timeoutSeconds) && timeoutSeconds > 0) {
+      authTimeoutMs = timeoutSeconds * 1000
+      log(`Using auth callback timeout: ${timeoutSeconds} seconds`)
+    } else {
+      log(`Warning: Ignoring invalid auth timeout value: ${args[authTimeoutIndex + 1]}. Must be a positive number.`)
+    }
+  }
+
   if (!serverUrl) {
     log(usage)
     process.exit(1)
@@ -658,7 +778,19 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
     })
   }
 
-  return { serverUrl, callbackPort, headers, transportStrategy, host, debug, staticOAuthClientMetadata, staticOAuthClientInfo }
+  return {
+    serverUrl,
+    callbackPort,
+    headers,
+    transportStrategy,
+    host,
+    debug,
+    staticOAuthClientMetadata,
+    staticOAuthClientInfo,
+    authorizeResource,
+    ignoredTools,
+    authTimeoutMs,
+  }
 }
 
 /**
@@ -688,4 +820,41 @@ export function setupSignalHandlers(cleanup: () => Promise<void>) {
  */
 export function getServerUrlHash(serverUrl: string): string {
   return crypto.createHash('md5').update(serverUrl).digest('hex')
+}
+
+/**
+ * Converts a glob pattern to a regular expression
+ * @param pattern The glob pattern (e.g., "create*", "*account")
+ * @returns The corresponding regular expression
+ */
+function patternToRegex(pattern: string): RegExp {
+  // Split by asterisks, escape each part, then join with .*
+  const parts = pattern.split('*')
+  const escapedParts = parts.map((part) => part.replace(/\W/g, '\\$&'))
+  const regexPattern = escapedParts.join('.*')
+  // Match the entire string from start to end, case-insensitive
+  return new RegExp(`^${regexPattern}$`, 'i')
+}
+
+/**
+ * Determines if a tool name should be ignored based on ignore patterns
+ * @param ignorePatterns Array of patterns to ignore (supports wildcards with *)
+ * @param toolName The name of the tool to check
+ * @returns false if the tool should be ignored (matches a pattern), true if it should be included
+ */
+export function shouldIncludeTool(ignorePatterns: string[], toolName: string): boolean {
+  // If no patterns are provided, include all tools
+  if (!ignorePatterns || ignorePatterns.length === 0) {
+    return true
+  }
+
+  // Check if the tool name matches any ignore pattern
+  for (const pattern of ignorePatterns) {
+    const regex = patternToRegex(pattern)
+    if (regex.test(toolName)) {
+      return false // Tool matches an ignore pattern, so exclude it
+    }
+  }
+
+  return true // Tool doesn't match any ignore pattern, so include it
 }

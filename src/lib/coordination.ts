@@ -128,7 +128,12 @@ export async function waitForAuthentication(port: number): Promise<boolean> {
  * @param events The event emitter to use for signaling
  * @returns An AuthCoordinator object with an initializeAuth method
  */
-export function createLazyAuthCoordinator(serverUrlHash: string, callbackPort: number, events: EventEmitter): AuthCoordinator {
+export function createLazyAuthCoordinator(
+  serverUrlHash: string,
+  callbackPort: number,
+  events: EventEmitter,
+  authTimeoutMs: number,
+): AuthCoordinator {
   let authState: { server: Server; waitForAuthCode: () => Promise<string>; skipBrowserAuth: boolean } | null = null
 
   return {
@@ -143,7 +148,7 @@ export function createLazyAuthCoordinator(serverUrlHash: string, callbackPort: n
       debugLog('Initializing auth coordination on-demand', { serverUrlHash, callbackPort })
 
       // Initialize auth using the existing coordinateAuth logic
-      authState = await coordinateAuth(serverUrlHash, callbackPort, events)
+      authState = await coordinateAuth(serverUrlHash, callbackPort, events, authTimeoutMs)
       debugLog('Auth coordination completed', { skipBrowserAuth: authState.skipBrowserAuth })
       return authState
     },
@@ -161,6 +166,7 @@ export async function coordinateAuth(
   serverUrlHash: string,
   callbackPort: number,
   events: EventEmitter,
+  authTimeoutMs: number,
 ): Promise<{ server: Server; waitForAuthCode: () => Promise<string>; skipBrowserAuth: boolean }> {
   debugLog('Coordinating authentication', { serverUrlHash, callbackPort })
 
@@ -225,6 +231,7 @@ export async function coordinateAuth(
     port: callbackPort,
     path: '/oauth/callback',
     events,
+    authTimeoutMs,
   })
 
   // Get the actual port the server is running on
