@@ -153,6 +153,17 @@ You can specify multiple `--ignore-tool` flags to ignore different patterns. Exa
 - `*account` - ignores all tools ending with "account" (e.g., `getAccount`, `updateAccount`)
 - `exactTool` - ignores only the tool named exactly "exactTool"
 
+* To change the timeout for the OAuth callback (by default `30` seconds), add the `--auth-timeout` flag with a value in seconds. This is useful if the authentication process on the server side takes a long time.
+
+```json
+      "args": [
+        "mcp-remote",
+        "https://remote.mcp.server/sse",
+        "--auth-timeout",
+        "60"
+      ]
+```
+
 ### Transport Strategies
 
 MCP Remote supports different transport strategies when connecting to an MCP server. This allows you to control whether it uses Server-Sent Events (SSE) or HTTP transport, and in what order it tries them.
