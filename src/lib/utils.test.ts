@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { parseCommandLineArgs } from './utils'
+import { describe, it, expect, vi } from 'vitest'
+import { parseCommandLineArgs, shouldIncludeTool, mcpProxy } from './utils'
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
 // All sanitizeUrl tests have been moved to the strict-url-sanitise package
 
@@ -320,5 +321,391 @@ describe('Feature: Command Line Arguments Parsing', () => {
     expect(result.host).toBe('localhost')
     expect(result.transportStrategy).toBe('sse-only')
     expect(result.ignoredTools).toEqual(['tool1', 'tool2'])
+  })
+})
+
+describe('Feature: Tool Filtering with Ignore Patterns', () => {
+  it('Scenario: Single wildcard pattern ignores matching tools', () => {
+    // Given ignore patterns with create* wildcard
+    const ignorePatterns = ['create*']
+
+    // When checking if createTask should be included
+    const result1 = shouldIncludeTool(ignorePatterns, 'createTask')
+    // Then it should be excluded (return false)
+    expect(result1).toBe(false)
+
+    // When checking if getTask should be included
+    const result2 = shouldIncludeTool(ignorePatterns, 'getTask')
+    // Then it should be included (return true)
+    expect(result2).toBe(true)
+  })
+
+  it('Scenario: Multiple wildcard patterns ignore matching tools', () => {
+    // Given ignore patterns with create* and put* wildcards
+    const ignorePatterns = ['create*', 'put*']
+
+    // When checking if createTask should be included
+    const result1 = shouldIncludeTool(ignorePatterns, 'createTask')
+    // Then it should be excluded (return false)
+    expect(result1).toBe(false)
+
+    // When checking if infoTask should be included
+    const result2 = shouldIncludeTool(ignorePatterns, 'infoTask')
+    // Then it should be included (return true)
+    expect(result2).toBe(true)
+  })
+
+  it('Scenario: Suffix wildcard pattern ignores matching tools', () => {
+    // Given ignore patterns with *account suffix wildcard
+    const ignorePatterns = ['*account']
+
+    // When checking various account-related tools
+    const result1 = shouldIncludeTool(ignorePatterns, 'getAccount')
+    const result2 = shouldIncludeTool(ignorePatterns, 'putAccount')
+    const result3 = shouldIncludeTool(ignorePatterns, 'account')
+
+    // Then all should be excluded (return false)
+    expect(result1).toBe(false)
+    expect(result2).toBe(false)
+    expect(result3).toBe(false)
+  })
+
+  it('Scenario: Empty ignore patterns include all tools', () => {
+    // Given empty ignore patterns
+    const ignorePatterns: string[] = []
+
+    // When checking any tool
+    const result = shouldIncludeTool(ignorePatterns, 'anyTool')
+
+    // Then it should be included (return true)
+    expect(result).toBe(true)
+  })
+
+  it('Scenario: Non-matching patterns include tools', () => {
+    // Given ignore patterns that don't match the tool
+    const ignorePatterns = ['delete*', 'remove*']
+
+    // When checking a tool that doesn't match any pattern
+    const result = shouldIncludeTool(ignorePatterns, 'createTask')
+
+    // Then it should be included (return true)
+    expect(result).toBe(true)
+  })
+
+  it('Scenario: Exact match without wildcards', () => {
+    // Given ignore patterns with exact tool names
+    const ignorePatterns = ['exactTool', 'anotherTool']
+
+    // When checking the exact tool name
+    const result1 = shouldIncludeTool(ignorePatterns, 'exactTool')
+    // Then it should be excluded (return false)
+    expect(result1).toBe(false)
+
+    // When checking a different tool name
+    const result2 = shouldIncludeTool(ignorePatterns, 'differentTool')
+    // Then it should be included (return true)
+    expect(result2).toBe(true)
+  })
+})
+
+describe('Feature: MCP Proxy', () => {
+  it('Scenario: Proxy initialize message from client to server', async () => {
+    // Given mock transports for client and server
+    const mockTransportToClient = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    const mockTransportToServer = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    // When setting up the proxy
+    mcpProxy({
+      transportToClient: mockTransportToClient,
+      transportToServer: mockTransportToServer,
+      ignoredTools: [],
+    })
+
+    // And when client sends an initialize message
+    const initializeMessage = {
+      jsonrpc: '2.0' as const,
+      method: 'initialize',
+      id: '1',
+      params: {
+        clientInfo: {
+          name: 'Test Client',
+          version: '1.0.0',
+        },
+      },
+    }
+
+    // Simulate client sending a message by calling the message handler directly
+    if (mockTransportToClient.onmessage) {
+      mockTransportToClient.onmessage(initializeMessage)
+    }
+
+    // Then the message should be forwarded to the server
+    expect(mockTransportToServer.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonrpc: '2.0',
+        method: 'initialize',
+        id: '1',
+        params: expect.objectContaining({
+          clientInfo: expect.objectContaining({
+            name: expect.stringContaining('Test Client'),
+            version: '1.0.0',
+          }),
+        }),
+      }),
+    )
+  })
+
+  it('Scenario: Proxy server response back to client', async () => {
+    // Given mock transports for client and server
+    const mockTransportToClient = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    const mockTransportToServer = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    // When setting up the proxy
+    mcpProxy({
+      transportToClient: mockTransportToClient,
+      transportToServer: mockTransportToServer,
+      ignoredTools: [],
+    })
+
+    // First simulate client sending a request (so there's a pending request)
+    const clientRequest = {
+      jsonrpc: '2.0' as const,
+      method: 'initialize',
+      id: '1',
+      params: {
+        clientInfo: {
+          name: 'Test Client',
+          version: '1.0.0',
+        },
+      },
+    }
+
+    if (mockTransportToClient.onmessage) {
+      mockTransportToClient.onmessage(clientRequest)
+    }
+
+    // Clear the previous call
+    vi.clearAllMocks()
+
+    // Now simulate server sending a response message
+    const serverResponse = {
+      jsonrpc: '2.0' as const,
+      id: '1',
+      result: {
+        capabilities: {
+          tools: {
+            listChanged: true,
+          },
+        },
+        serverInfo: {
+          name: 'Atlassian MCP',
+          version: '1.0.0',
+        },
+      },
+    }
+
+    // Simulate server sending a response by calling the message handler directly
+    if (mockTransportToServer.onmessage) {
+      mockTransportToServer.onmessage(serverResponse)
+    }
+
+    // Then the response should be forwarded to the client
+    expect(mockTransportToClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonrpc: '2.0',
+        id: '1',
+        result: {
+          capabilities: {
+            tools: {
+              listChanged: true,
+            },
+          },
+          serverInfo: {
+            name: 'Atlassian MCP',
+            version: '1.0.0',
+          },
+        },
+      }),
+    )
+  })
+
+  it('Scenario: Close server transport when client transport closes', async () => {
+    // Given mock transports for client and server
+    const mockTransportToClient = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    const mockTransportToServer = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    // When setting up the proxy
+    mcpProxy({
+      transportToClient: mockTransportToClient,
+      transportToServer: mockTransportToServer,
+      ignoredTools: [],
+    })
+
+    // And when client transport closes
+    if (mockTransportToClient.onclose) {
+      mockTransportToClient.onclose()
+    }
+
+    // Then server transport should also be closed
+    expect(mockTransportToServer.close).toHaveBeenCalled()
+  })
+
+  it('Scenario: Close client transport when server transport closes', async () => {
+    // Given mock transports for client and server
+    const mockTransportToClient = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    const mockTransportToServer = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    // When setting up the proxy
+    mcpProxy({
+      transportToClient: mockTransportToClient,
+      transportToServer: mockTransportToServer,
+      ignoredTools: [],
+    })
+
+    // And when server transport closes
+    if (mockTransportToServer.onclose) {
+      mockTransportToServer.onclose()
+    }
+
+    // Then client transport should also be closed
+    expect(mockTransportToClient.close).toHaveBeenCalled()
+  })
+
+  it('Scenario: Filter tools in tools/list response when ignoredTools is configured', async () => {
+    // Given mock transports for client and server
+    const mockTransportToClient = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    const mockTransportToServer = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    // When setting up the proxy with ignored tools
+    mcpProxy({
+      transportToClient: mockTransportToClient,
+      transportToServer: mockTransportToServer,
+      ignoredTools: ['delete*', 'remove*'],
+    })
+
+    // First simulate client sending a tools/list request
+    const toolsListRequest = {
+      jsonrpc: '2.0' as const,
+      method: 'tools/list',
+      id: '2',
+      params: {},
+    }
+
+    if (mockTransportToClient.onmessage) {
+      mockTransportToClient.onmessage(toolsListRequest)
+    }
+
+    // Clear the previous call
+    vi.clearAllMocks()
+
+    // Now simulate server sending a tools/list response with various tools
+    const serverToolsResponse = {
+      jsonrpc: '2.0' as const,
+      id: '2',
+      result: {
+        tools: [
+          { name: 'createTask', description: 'Create a new task' },
+          { name: 'deleteTask', description: 'Delete a task' },
+          { name: 'updateTask', description: 'Update a task' },
+          { name: 'removeUser', description: 'Remove a user' },
+          { name: 'listTasks', description: 'List all tasks' },
+        ],
+      },
+    }
+
+    // Simulate server sending a response
+    if (mockTransportToServer.onmessage) {
+      mockTransportToServer.onmessage(serverToolsResponse)
+    }
+
+    // Then the response should be forwarded to the client with filtered tools
+    expect(mockTransportToClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonrpc: '2.0',
+        id: '2',
+        result: {
+          tools: [
+            { name: 'createTask', description: 'Create a new task' },
+            { name: 'updateTask', description: 'Update a task' },
+            { name: 'listTasks', description: 'List all tasks' },
+          ],
+        },
+      }),
+    )
   })
 })
