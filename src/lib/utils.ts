@@ -81,12 +81,14 @@ export function log(str: string, ...rest: unknown[]) {
 }
 
 type Message = any
+const MESSAGE_BLOCKED = Symbol('MessageBlocked')
+const isMessageBlocked = (value: any): value is typeof MESSAGE_BLOCKED => value === MESSAGE_BLOCKED
 
 export function createMessageTransformer({
   transformRequestFunction,
   transformResponseFunction,
 }: {
-  transformRequestFunction?: null | ((request: Message) => Message)
+  transformRequestFunction?: null | ((request: Message) => Message | typeof MESSAGE_BLOCKED)
   transformResponseFunction?: null | ((request: Message, response: Message) => Message)
 } = {}) {
   const pendingRequests = new Map<string, Message>()
@@ -129,7 +131,27 @@ export function mcpProxy({
   let transportToServerClosed = false
 
   const messageTransformer = createMessageTransformer({
-    transformRequestFunction: null,
+    transformRequestFunction: (request: Message) => {
+      // Block tools/call for ignored tools
+      if (request.method === 'tools/call' && request.params?.name) {
+        const toolName = request.params.name
+        if (!shouldIncludeTool(ignoredTools, toolName)) {
+          // Send error response back to client immediately
+          const errorResponse = {
+            jsonrpc: '2.0' as const,
+            id: request.id,
+            error: {
+              code: -32603,
+              message: `Tool "${toolName}" is not available`,
+            },
+          }
+          transportToClient.send(errorResponse).catch(onClientError)
+          // Return symbol to indicate this request should not be forwarded
+          return MESSAGE_BLOCKED
+        }
+      }
+      return request
+    },
     transformResponseFunction: (req: Message, res: Message) => {
       if (req.method === 'tools/list') {
         return {
@@ -147,6 +169,12 @@ export function mcpProxy({
   transportToClient.onmessage = (_message) => {
     // TODO: fix types
     const message = messageTransformer.interceptRequest(_message as any)
+
+    // If interceptor returns MESSAGE_BLOCKED, don't forward the message
+    if (isMessageBlocked(message)) {
+      return
+    }
+
     log('[Local→Remote]', message.method || message.id)
 
     if (DEBUG) {
