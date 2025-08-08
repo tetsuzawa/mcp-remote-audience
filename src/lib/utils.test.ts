@@ -708,4 +708,68 @@ describe('Feature: MCP Proxy', () => {
       }),
     )
   })
+
+  it('Scenario: Block tools/call for ignored tools with delete* filter', async () => {
+    // Given mock transports for client and server
+    const mockTransportToClient = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    const mockTransportToServer = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue(undefined),
+      onmessage: vi.fn(),
+      onclose: vi.fn(),
+      onerror: vi.fn(),
+    } as unknown as Transport
+
+    // When setting up the proxy with delete* filter
+    mcpProxy({
+      transportToClient: mockTransportToClient,
+      transportToServer: mockTransportToServer,
+      ignoredTools: ['delete*'],
+    })
+
+    // And when client tries to call a deleteTask tool
+    const toolsCallMessage = {
+      jsonrpc: '2.0' as const,
+      method: 'tools/call',
+      id: '3',
+      params: {
+        name: 'deleteTask',
+        arguments: {
+          taskId: '1',
+        },
+        _meta: {
+          progressToken: 1,
+        },
+      },
+    }
+
+    // Simulate client sending the tools/call message
+    if (mockTransportToClient.onmessage) {
+      mockTransportToClient.onmessage(toolsCallMessage)
+    }
+
+    // Then the call should NOT be forwarded to the server
+    expect(mockTransportToServer.send).not.toHaveBeenCalled()
+
+    // And an error response should be sent back to the client
+    expect(mockTransportToClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonrpc: '2.0',
+        id: '3',
+        error: expect.objectContaining({
+          code: expect.any(Number),
+          message: expect.stringContaining('Tool "deleteTask" is not available'),
+        }),
+      }),
+    )
+  })
 })
