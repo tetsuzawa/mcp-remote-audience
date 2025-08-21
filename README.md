@@ -1,4 +1,16 @@
-# `mcp-remote`
+# `mcp-remote-audience`
+
+This is a fork of [geelen/mcp-remote](https://github.com/geelen/mcp-remote) that provides a workaround for Auth0's non-standard OAuth implementation.
+
+## Why this fork exists
+
+Auth0, as an authorization server, expects the `audience` parameter instead of the `resource` parameter specified in [RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707). This deviation from the standard creates compatibility issues when using MCP servers with Auth0-based authentication.
+
+This fork modifies the original `mcp-remote` to use the `audience` parameter that Auth0 expects, enabling proper OAuth flows with Auth0's authorization server. This is a temporary workaround until Auth0 supports the RFC 8707-compliant `resource` parameter.
+
+For more context, see the [Auth0 Community discussion](https://community.auth0.com/t/rfc-8707-implementation-audience-vs-resource/188990/3) about this issue.
+
+---
 
 Connect an MCP Client that only supports local (stdio) servers to a Remote MCP Server, with auth support:
 
@@ -12,7 +24,7 @@ But there's a reason most software that _could_ be moved to the web _did_ get mo
 
 With the latest MCP [Authorization specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization), we now have a secure way of sharing our MCP servers with the world _without_ running code on user's laptops. Or at least, you would, if all the popular MCP _clients_ supported it yet. Most are stdio-only, and those that _do_ support HTTP+SSE don't yet support the OAuth flows required.
 
-That's where `mcp-remote` comes in. As soon as your chosen MCP client supports remote, authorized servers, you can remove it. Until that time, drop in this one liner and dress for the MCP clients you want!
+That's where `mcp-remote-audience` comes in. As soon as your chosen MCP client supports remote, authorized servers, you can remove it. Until that time, drop in this one liner and dress for the MCP clients you want!
 
 ## Usage
 
@@ -24,7 +36,7 @@ All the most popular MCP clients (Claude Desktop, Cursor & Windsurf) use the fol
     "remote-example": {
       "command": "npx",
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse"
       ]
     }
@@ -42,7 +54,7 @@ To bypass authentication, or to emit custom headers on all requests to your remo
     "remote-example": {
       "command": "npx",
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse",
         "--header",
         "Authorization: Bearer ${AUTH_TOKEN}"
@@ -61,7 +73,7 @@ To bypass authentication, or to emit custom headers on all requests to your remo
 {
   // rest of config...
   "args": [
-    "mcp-remote",
+    "mcp-remote-audience",
     "https://remote.mcp.server/sse",
     "--header",
     "Authorization:${AUTH_HEADER}" // note no spaces around ':'
@@ -74,41 +86,41 @@ To bypass authentication, or to emit custom headers on all requests to your remo
 
 ### Flags
 
-* If `npx` is producing errors, consider adding `-y` as the first argument to auto-accept the installation of the `mcp-remote` package.
+* If `npx` is producing errors, consider adding `-y` as the first argument to auto-accept the installation of the `mcp-remote-audience` package.
 
 ```json
       "command": "npx",
       "args": [
         "-y"
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse"
       ]
 ```
 
-* To force `npx` to always check for an updated version of `mcp-remote`, add the `@latest` flag:
+* To force `npx` to always check for an updated version of `mcp-remote-audience`, add the `@latest` flag:
 
 ```json
       "args": [
-        "mcp-remote@latest",
+        "mcp-remote-audience@latest",
         "https://remote.mcp.server/sse"
       ]
 ```
 
-* To change which port `mcp-remote` listens for an OAuth redirect (by default `3334`), add an additional argument after the server URL. Note that whatever port you specify, if it is unavailable an open port will be chosen at random.
+* To change which port `mcp-remote-audience` listens for an OAuth redirect (by default `3334`), add an additional argument after the server URL. Note that whatever port you specify, if it is unavailable an open port will be chosen at random.
 
 ```json
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse",
         "9696"
       ]
 ```
 
-* To change which host `mcp-remote` registers as the OAuth callback URL (by default `localhost`), add the `--host` flag.
+* To change which host `mcp-remote-audience` registers as the OAuth callback URL (by default `localhost`), add the `--host` flag.
 
 ```json
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse",
         "--host",
         "127.0.0.1"
@@ -119,7 +131,7 @@ To bypass authentication, or to emit custom headers on all requests to your remo
 
 ```json
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "http://internal-service.vpc/sse",
         "--allow-http"
       ]
@@ -129,7 +141,7 @@ To bypass authentication, or to emit custom headers on all requests to your remo
 
 ```json
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse",
         "--debug"
       ]
@@ -142,7 +154,7 @@ MCP Remote supports different transport strategies when connecting to an MCP ser
 Specify the transport strategy with the `--transport` flag:
 
 ```bash
-npx mcp-remote https://example.remote/server --transport sse-only
+npx mcp-remote-audience https://example.remote/server --transport sse-only
 ```
 
 **Available Strategies:**
@@ -154,15 +166,15 @@ npx mcp-remote https://example.remote/server --transport sse-only
 
 ### Static OAuth Client Metadata
 
-MCP Remote supports providing static OAuth client metadata instead of using the mcp-remote defaults.
+MCP Remote supports providing static OAuth client metadata instead of using the mcp-remote-audience defaults.
 This is useful when connecting to OAuth servers that expect specific client/software IDs or scopes.
 
 Provide the client metadata as a JSON string or as a `@` prefixed filepath with the `--static-oauth-client-metadata` flag:
 
 ```bash
-npx mcp-remote https://example.remote/server --static-oauth-client-metadata '{ "scope": "space separated scopes" }'
+npx mcp-remote-audience https://example.remote/server --static-oauth-client-metadata '{ "scope": "space separated scopes" }'
 # uses node readfile, so you probably want to use absolute paths if you're not sure what the cwd is
-npx mcp-remote https://example.remote/server --static-oauth-client-metadata '@/Users/username/Library/Application Support/Claude/oauth_client_metadata.json'
+npx mcp-remote-audience https://example.remote/server --static-oauth-client-metadata '@/Users/username/Library/Application Support/Claude/oauth_client_metadata.json'
 ```
 
 ### Static OAuth Client Information
@@ -178,9 +190,9 @@ Provide the client metadata as a JSON string or as a `@` prefixed filepath with 
 ```bash
 export MCP_REMOTE_CLIENT_ID=xxx
 export MCP_REMOTE_CLIENT_SECRET=yyy
-npx mcp-remote https://example.remote/server --static-oauth-client-info "{ \"client_id\": \"$MCP_REMOTE_CLIENT_ID\", \"client_secret\": \"$MCP_REMOTE_CLIENT_SECRET\" }"
+npx mcp-remote-audience https://example.remote/server --static-oauth-client-info "{ \"client_id\": \"$MCP_REMOTE_CLIENT_ID\", \"client_secret\": \"$MCP_REMOTE_CLIENT_SECRET\" }"
 # uses node readfile, so you probably want to use absolute paths if you're not sure what the cwd is
-npx mcp-remote https://example.remote/server --static-oauth-client-info '@/Users/username/Library/Application Support/Claude/oauth_client_info.json'
+npx mcp-remote-audience https://example.remote/server --static-oauth-client-info '@/Users/username/Library/Application Support/Claude/oauth_client_info.json'
 ```
 
 ### Claude Desktop
@@ -202,7 +214,7 @@ of the input box.
 
 [Official Docs](https://docs.cursor.com/context/model-context-protocol). The configuration file is located at `~/.cursor/mcp.json`.
 
-As of version `0.48.0`, Cursor supports unauthed SSE servers directly. If your MCP server is using the official MCP OAuth authorization protocol, you still need to add a **"command"** server and call `mcp-remote`.
+As of version `0.48.0`, Cursor supports unauthed SSE servers directly. If your MCP server is using the official MCP OAuth authorization protocol, you still need to add a **"command"** server and call `mcp-remote-audience`.
 
 ### Windsurf
 
@@ -229,7 +241,7 @@ Know of more resources you'd like to share? Please add them to this Readme and s
 
 ### Clear your `~/.mcp-auth` directory
 
-`mcp-remote` stores all the credential information inside `~/.mcp-auth` (or wherever your `MCP_REMOTE_CONFIG_DIR` points to). If you're having persistent issues, try running:
+`mcp-remote-audience` stores all the credential information inside `~/.mcp-auth` (or wherever your `MCP_REMOTE_CONFIG_DIR` points to). If you're having persistent issues, try running:
 
 ```sh
 rm -rf ~/.mcp-auth
@@ -260,7 +272,7 @@ this might look like:
     "remote-example": {
       "command": "npx",
       "args": [
-        "mcp-remote",
+        "mcp-remote-audience",
         "https://remote.mcp.server/sse"
       ],
       "env": {
@@ -286,7 +298,7 @@ For troubleshooting complex issues, especially with token refreshing or authenti
 
 ```json
 "args": [
-  "mcp-remote",
+  "mcp-remote-audience",
   "https://remote.mcp.server/sse",
   "--debug"
 ]
@@ -310,7 +322,7 @@ You can run `rm -rf ~/.mcp-auth` to clear any locally stored state and tokens.
 Run the following on the command line (not from an MCP server):
 
 ```shell
-npx -p mcp-remote@latest mcp-remote-client https://remote.mcp.server/sse
+npx -p mcp-remote-audience@latest mcp-remote-client https://remote.mcp.server/sse
 ```
 
 This will run through the entire authorization flow and attempt to list the tools & resources at the remote URL. Try this after running `rm -rf ~/.mcp-auth` to see if stale credentials are your problem, otherwise hopefully the issue will be more obvious in these logs than those in your MCP client.

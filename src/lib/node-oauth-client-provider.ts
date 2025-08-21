@@ -171,7 +171,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     if (this.authorizeResource) {
-      authorizationUrl.searchParams.set('resource', this.authorizeResource)
+      authorizationUrl.searchParams.set('audience', this.authorizeResource)
     }
 
     log(`\nPlease authorize this client by visiting:\n${authorizationUrl.toString()}\n`)
