@@ -19,8 +19,8 @@
   ],
   "main": "dist/index.js",
   "bin": {
-    "mcp-remote": "dist/proxy.js",
-    "mcp-remote-client": "dist/client.js"
+    "mcp-remote-audience": "dist/proxy.js",
+    "mcp-remote-audience-client": "dist/client.js"
   },
   "scripts": {
     "build": "tsup",
