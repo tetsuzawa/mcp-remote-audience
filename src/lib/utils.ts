@@ -534,7 +534,7 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
   while (i < args.length) {
     if (args[i] === '--header' && i < args.length - 1) {
       const value = args[i + 1]
-      const match = value.match(/^([A-Za-z0-9_-]+):(.*)$/)
+      const match = value.match(/^([A-Za-z0-9_-]+):\s*(.*)$/)
       if (match) {
         headers[match[1]] = match[2]
       } else {
