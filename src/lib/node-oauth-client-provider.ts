@@ -210,8 +210,10 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       authorizationUrl.searchParams.set('resource', this.authorizeResource)
     }
 
-    authorizationUrl.searchParams.set('scope', this._scopes)
-    if (DEBUG) debugLog('Added scope parameter to authorization URL', { scopes: this._scopes })
+    if (this._scopes) {
+      authorizationUrl.searchParams.set('scope', this._scopes)
+      if (DEBUG) debugLog('Added scope parameter to authorization URL', { scopes: this._scopes })
+    }
 
     log(`\nPlease authorize this client by visiting:\n${authorizationUrl.toString()}\n`)
 
