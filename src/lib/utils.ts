@@ -14,7 +14,7 @@ import fs from 'fs'
 import { readFile, rm } from 'fs/promises'
 import path from 'path'
 import { version as MCP_REMOTE_VERSION } from '../../package.json'
-import { fetch, setGlobalDispatcher, RequestInit, EnvHttpProxyAgent } from 'undici';
+import { fetch, setGlobalDispatcher, RequestInit, EnvHttpProxyAgent } from 'undici'
 
 // Global type declaration for typescript
 declare global {
@@ -32,9 +32,6 @@ export { MCP_REMOTE_VERSION }
 const pid = process.pid
 // Global debug flag
 export let DEBUG = false
-
-// Use env proxy
-setGlobalDispatcher(new EnvHttpProxyAgent());
 
 // Helper function for timestamp formatting
 function getTimestamp(): string {
@@ -644,6 +641,13 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
   if (debug) {
     DEBUG = true
     log('Debug mode enabled - detailed logs will be written to ~/.mcp-auth/')
+  }
+
+  const enableProxy = args.includes('--enable-proxy')
+  if (enableProxy) {
+    // Use env proxy
+    setGlobalDispatcher(new EnvHttpProxyAgent())
+    log('HTTP proxy support enabled - using system HTTP_PROXY/HTTPS_PROXY environment variables')
   }
 
   // Parse transport strategy
