@@ -135,6 +135,20 @@ To bypass authentication, or to emit custom headers on all requests to your remo
       ]
 ```
 
+* To enable an outbound HTTP(S) proxy for mcp-remote, add the `--enable-proxy` flag. When enabled, mcp-remote will use the proxy settings from common environment variables (for example `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`).
+
+```json
+    "args": [
+      "mcp-remote",
+      "https://remote.mcp.server/sse",
+      "--enable-proxy"
+    ],
+    "env": {
+      "HTTPS_PROXY": "http://127.0.0.1:3128",
+      "NO_PROXY": "localhost,127.0.0.1"
+    }
+```
+
 * To ignore specific tools from the remote server, add the `--ignore-tool` flag. This will filter out tools matching the specified patterns from both `tools/list` responses and block `tools/call` requests. Supports wildcard patterns with `*`.
 
 ```json
