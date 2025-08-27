@@ -19,8 +19,8 @@ importers:
         version: 0.0.1
     devDependencies:
       '@modelcontextprotocol/sdk':
-        specifier: https://pkg.pr.new/geelen/typescript-sdk/@modelcontextprotocol/sdk@877f4bf
-        version: https://pkg.pr.new/geelen/typescript-sdk/@modelcontextprotocol/sdk@877f4bf
+        specifier: ^1.17.3
+        version: 1.17.4
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.0
@@ -217,9 +217,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
 
-  '@modelcontextprotocol/sdk@https://pkg.pr.new/geelen/typescript-sdk/@modelcontextprotocol/sdk@877f4bf':
-    resolution: {tarball: https://pkg.pr.new/geelen/typescript-sdk/@modelcontextprotocol/sdk@877f4bf}
-    version: 1.13.3
+  '@modelcontextprotocol/sdk@1.17.4':
+    resolution: {integrity: sha512-zq24hfuAmmlNZvik0FLI58uE5sriN0WWsQzIlYnzSuKDAHFqJtBFrl/LfB1NLgJT5Y7dEBzaX4yAKqOPrcetaw==}
     engines: {node: '>=18'}
 
   '@pkgjs/parseargs@0.11.0':
@@ -1447,7 +1446,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
 
-  '@modelcontextprotocol/sdk@https://pkg.pr.new/geelen/typescript-sdk/@modelcontextprotocol/sdk@877f4bf':
+  '@modelcontextprotocol/sdk@1.17.4':
     dependencies:
       ajv: 6.12.6
       content-type: 1.0.5
