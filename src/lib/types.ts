@@ -29,8 +29,6 @@ export interface OAuthProviderOptions {
   staticOAuthClientInfo?: StaticOAuthClientInformationFull
   /** Resource parameter to send to the authorization server */
   authorizeResource?: string
-  /** OAuth scopes to request (default: 'openid email profile') */
-  scopes?: string
 }
 
 /**

@@ -27,7 +27,6 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   private staticOAuthClientMetadata: StaticOAuthClientMetadata
   private staticOAuthClientInfo: StaticOAuthClientInformationFull
   private authorizeResource: string | undefined
-  private _scopes: string | undefined
   private _state: string
 
   /**
@@ -44,7 +43,6 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     this.staticOAuthClientMetadata = options.staticOAuthClientMetadata
     this.staticOAuthClientInfo = options.staticOAuthClientInfo
     this.authorizeResource = options.authorizeResource
-    this._scopes = options.scopes || 'openid email profile'
     this._state = randomUUID()
   }
 
@@ -62,7 +60,6 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       client_uri: this.clientUri,
       software_id: this.softwareId,
       software_version: this.softwareVersion,
-      scope: this._scopes,
       ...this.staticOAuthClientMetadata,
     }
   }
@@ -86,34 +83,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       'client_info.json',
       OAuthClientInformationFullSchema,
     )
-
-    // Also load stored scopes from registration (these override options-based scopes)
-    if (clientInfo) {
-      const scopesData = await readJsonFile<{ scopes: string }>(this.serverUrlHash, 'scopes.json', {
-        parseAsync: async (data: any) => data,
-      })
-      if (scopesData?.scopes) {
-        this._scopes = scopesData.scopes
-        debugLog('Loaded stored scopes from registration', { scopes: this._scopes })
-      }
-    }
-
     debugLog('Client info result:', clientInfo ? 'Found' : 'Not found')
     return clientInfo
-  }
-
-  /**
-   * Extracts scopes from OAuth registration response
-   * @param clientInfo The client registration response
-   * @returns The extracted scopes as a space-separated string
-   */
-  private extractScopesFromRegistration(clientInfo: any): string {
-    if (clientInfo.scope) return clientInfo.scope
-    if (clientInfo.default_scope) return clientInfo.default_scope
-    if (Array.isArray(clientInfo.scopes)) return clientInfo.scopes.join(' ')
-    if (Array.isArray(clientInfo.default_scopes)) return clientInfo.default_scopes.join(' ')
-
-    return 'openid email profile'
   }
 
   /**
@@ -122,14 +93,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    */
   async saveClientInformation(clientInformation: OAuthClientInformationFull): Promise<void> {
     debugLog('Saving client info', { client_id: clientInformation.client_id })
-
-    const scopes = this.extractScopesFromRegistration(clientInformation as any)
-
-    debugLog('Extracted scopes from registration response', { scopes })
-    this._scopes = scopes
-
     await writeJsonFile(this.serverUrlHash, 'client_info.json', clientInformation)
-    await writeJsonFile(this.serverUrlHash, 'scopes.json', { scopes })
   }
 
   /**
@@ -204,11 +168,6 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       authorizationUrl.searchParams.set('resource', this.authorizeResource)
     }
 
-    if (this._scopes) {
-      authorizationUrl.searchParams.set('scope', this._scopes)
-      debugLog('Added scope parameter to authorization URL', { scopes: this._scopes })
-    }
-
     log(`\nPlease authorize this client by visiting:\n${authorizationUrl.toString()}\n`)
 
     debugLog('Redirecting to authorization URL', authorizationUrl.toString())
@@ -255,14 +214,12 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
           deleteConfigFile(this.serverUrlHash, 'client_info.json'),
           deleteConfigFile(this.serverUrlHash, 'tokens.json'),
           deleteConfigFile(this.serverUrlHash, 'code_verifier.txt'),
-          deleteConfigFile(this.serverUrlHash, 'scopes.json'),
         ])
         debugLog('All credentials invalidated')
         break
 
       case 'client':
-        await Promise.all([deleteConfigFile(this.serverUrlHash, 'client_info.json'), deleteConfigFile(this.serverUrlHash, 'scopes.json')])
-        this._scopes = this.options.scopes || 'openid email profile'
+        await deleteConfigFile(this.serverUrlHash, 'client_info.json')
         debugLog('Client information invalidated')
         break
 
