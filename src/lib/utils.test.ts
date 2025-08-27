@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
-import { parseCommandLineArgs, shouldIncludeTool, mcpProxy } from './utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { parseCommandLineArgs, shouldIncludeTool, mcpProxy, setupOAuthCallbackServerWithLongPoll } from './utils'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
+import { EventEmitter } from 'events'
+import express from 'express'
 
 // All sanitizeUrl tests have been moved to the strict-url-sanitise package
 
@@ -321,6 +323,100 @@ describe('Feature: Command Line Arguments Parsing', () => {
     expect(result.host).toBe('localhost')
     expect(result.transportStrategy).toBe('sse-only')
     expect(result.ignoredTools).toEqual(['tool1', 'tool2'])
+  })
+
+  it('Scenario: Use default auth timeout when not specified', async () => {
+    // Given command line arguments without --auth-timeout flag
+    const args = ['https://example.com/sse']
+    const usage = 'test usage'
+
+    // When parsing the command line arguments
+    const result = await parseCommandLineArgs(args, usage)
+
+    // Then the default auth timeout should be 30000ms
+    expect(result.authTimeoutMs).toBe(30000)
+  })
+
+  it('Scenario: Parse valid auth timeout in seconds and convert to milliseconds', async () => {
+    // Given command line arguments with valid --auth-timeout
+    const args = ['https://example.com/sse', '--auth-timeout', '60']
+    const usage = 'test usage'
+
+    // When parsing the command line arguments
+    const result = await parseCommandLineArgs(args, usage)
+
+    // Then the timeout should be converted to milliseconds
+    expect(result.authTimeoutMs).toBe(60000)
+  })
+
+  it('Scenario: Use default timeout when invalid auth timeout value is provided', async () => {
+    // Given command line arguments with invalid --auth-timeout value
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const args = ['https://example.com/sse', '--auth-timeout', 'invalid']
+    const usage = 'test usage'
+
+    // When parsing the command line arguments
+    const result = await parseCommandLineArgs(args, usage)
+
+    // Then the default timeout should be used and warning logged
+    expect(result.authTimeoutMs).toBe(30000)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Warning: Ignoring invalid auth timeout value: invalid. Must be a positive number.'),
+    )
+
+    consoleSpy.mockRestore()
+  })
+
+  it('Scenario: Use default timeout when negative auth timeout value is provided', async () => {
+    // Given command line arguments with negative --auth-timeout value
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const args = ['https://example.com/sse', '--auth-timeout', '-30']
+    const usage = 'test usage'
+
+    // When parsing the command line arguments
+    const result = await parseCommandLineArgs(args, usage)
+
+    // Then the default timeout should be used and warning logged
+    expect(result.authTimeoutMs).toBe(30000)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Warning: Ignoring invalid auth timeout value: -30. Must be a positive number.'),
+    )
+
+    consoleSpy.mockRestore()
+  })
+
+  it('Scenario: Use default timeout when zero auth timeout value is provided', async () => {
+    // Given command line arguments with zero --auth-timeout value
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const args = ['https://example.com/sse', '--auth-timeout', '0']
+    const usage = 'test usage'
+
+    // When parsing the command line arguments
+    const result = await parseCommandLineArgs(args, usage)
+
+    // Then the default timeout should be used and warning logged
+    expect(result.authTimeoutMs).toBe(30000)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Warning: Ignoring invalid auth timeout value: 0. Must be a positive number.'),
+    )
+
+    consoleSpy.mockRestore()
+  })
+
+  it('Scenario: Log when using custom auth timeout', async () => {
+    // Given command line arguments with custom --auth-timeout value
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const args = ['https://example.com/sse', '--auth-timeout', '45']
+    const usage = 'test usage'
+
+    // When parsing the command line arguments
+    const result = await parseCommandLineArgs(args, usage)
+
+    // Then the custom timeout should be used and logged
+    expect(result.authTimeoutMs).toBe(45000)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Using auth callback timeout: 45 seconds'))
+
+    consoleSpy.mockRestore()
   })
 })
 
@@ -771,5 +867,51 @@ describe('Feature: MCP Proxy', () => {
         }),
       }),
     )
+  })
+})
+
+describe('setupOAuthCallbackServerWithLongPoll', () => {
+  let server: any
+  let events: EventEmitter
+
+  beforeEach(() => {
+    events = new EventEmitter()
+  })
+
+  afterEach(() => {
+    if (server) {
+      server.close()
+      server = null
+    }
+  })
+
+  it('should use custom timeout when authTimeoutMs is provided', async () => {
+    const customTimeout = 5000
+    const result = setupOAuthCallbackServerWithLongPoll({
+      port: 0, // Use any available port
+      path: '/oauth/callback',
+      events,
+      authTimeoutMs: customTimeout,
+    })
+
+    server = result.server
+
+    // Test that the server was created
+    expect(server).toBeDefined()
+    expect(typeof result.waitForAuthCode).toBe('function')
+  })
+
+  it('should use default timeout when authTimeoutMs is not provided', async () => {
+    const result = setupOAuthCallbackServerWithLongPoll({
+      port: 0, // Use any available port
+      path: '/oauth/callback',
+      events,
+    })
+
+    server = result.server
+
+    // Test that the server was created with defaults
+    expect(server).toBeDefined()
+    expect(typeof result.waitForAuthCode).toBe('function')
   })
 })
