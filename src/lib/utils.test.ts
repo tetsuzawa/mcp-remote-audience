@@ -65,7 +65,7 @@ describe('Feature: Command Line Arguments Parsing', () => {
 
     // Then the custom header should be correctly parsed
     expect(result.serverUrl).toBe('https://example.com/sse')
-    expect(result.headers).toEqual({ foo: ' taz' })
+    expect(result.headers).toEqual({ foo: 'taz' })
   })
 
   it('Scenario: Parse multiple custom headers', async () => {
@@ -79,8 +79,8 @@ describe('Feature: Command Line Arguments Parsing', () => {
     // Then all custom headers should be correctly parsed
     expect(result.serverUrl).toBe('https://example.com/sse')
     expect(result.headers).toEqual({
-      Authorization: ' Bearer token123',
-      'Content-Type': ' application/json',
+      Authorization: 'Bearer token123',
+      'Content-Type': 'application/json',
     })
   })
 
@@ -132,7 +132,7 @@ describe('Feature: Command Line Arguments Parsing', () => {
     // Then all arguments should be correctly parsed including HTTP URL acceptance
     expect(result.serverUrl).toBe('http://example.com/sse')
     expect(result.callbackPort).toBe(4000)
-    expect(result.headers).toEqual({ Authorization: ' Bearer abc123' })
+    expect(result.headers).toEqual({ Authorization: 'Bearer abc123' })
   })
 
   it('Scenario: Use default transport strategy when not specified', async () => {
