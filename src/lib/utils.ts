@@ -14,7 +14,7 @@ import fs from 'fs'
 import { readFile, rm } from 'fs/promises'
 import path from 'path'
 import { version as MCP_REMOTE_VERSION } from '../../package.json'
-import { fetch, setGlobalDispatcher, RequestInit, EnvHttpProxyAgent } from 'undici'
+import { EnvHttpProxyAgent, fetch, Headers, RequestInit, setGlobalDispatcher } from 'undici'
 
 // Global type declaration for typescript
 declare global {
@@ -279,7 +279,9 @@ export async function connectToRemoteServer(
         fetch(url, {
           ...init,
           headers: {
-            ...(init?.headers as Record<string, string> | undefined),
+            ...(init?.headers instanceof Headers
+              ? Object.fromEntries(init?.headers.entries())
+              : (init?.headers as Record<string, string>) || {}),
             ...headers,
             ...(tokens?.access_token ? { Authorization: `Bearer ${tokens.access_token}` } : {}),
             Accept: 'text/event-stream',
